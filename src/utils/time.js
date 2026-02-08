@@ -1,6 +1,5 @@
 export const TARGET_HOURS = 486;
 export const ROUND_STEP_MINUTES = 60;
-export const BASELINE_COMPLETED_MINUTES = 20 * 60;
 
 export const formatTime = (date) =>
   new Intl.DateTimeFormat("en-US", {
@@ -27,6 +26,27 @@ export const formatDateTime = (date) =>
     minute: "2-digit",
     hour12: true,
   }).format(date);
+
+export const startOfWeekMonday = (date) => {
+  const start = new Date(date);
+  const day = start.getDay();
+  const diff = (day + 6) % 7;
+  start.setDate(start.getDate() - diff);
+  start.setHours(0, 0, 0, 0);
+  return start;
+};
+
+export const endOfWeekFriday = (weekStart) => {
+  const end = new Date(weekStart);
+  end.setDate(end.getDate() + 4);
+  end.setHours(23, 59, 59, 999);
+  return end;
+};
+
+export const isWeekday = (date) => {
+  const day = date.getDay();
+  return day >= 1 && day <= 5;
+};
 
 export const roundUpToStep = (date, stepMinutes) => {
   const rounded = new Date(date);
