@@ -5,33 +5,19 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { useSessions } from "../hooks/useSessions.js";
 import {
   TARGET_HOURS,
-  BASELINE_COMPLETED_MINUTES,
   diffMinutes,
+  endOfWeekFriday,
   formatDate,
   formatHours,
   formatTime,
+  isWeekday,
   minutesToHours,
   roundDownToHour,
   roundUpToHour,
+  startOfWeekMonday,
 } from "../utils/time.js";
 
 const toDate = (ms) => (ms ? new Date(ms) : null);
-
-const startOfWeekMonday = (date) => {
-  const start = new Date(date);
-  const day = start.getDay();
-  const diff = (day + 6) % 7;
-  start.setDate(start.getDate() - diff);
-  start.setHours(0, 0, 0, 0);
-  return start;
-};
-
-const endOfWeekFriday = (weekStart) => {
-  const end = new Date(weekStart);
-  end.setDate(end.getDate() + 4);
-  end.setHours(23, 59, 59, 999);
-  return end;
-};
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -140,7 +126,13 @@ export default function Dashboard() {
   );
 
   const totals = useMemo(() => {
-    const completed = normalizedSessions.filter((session) => session.timeOut);
+    const completed = normalizedSessions.filter((session) => {
+      if (!session.timeOut || !session.timeInDate) return false;
+      if (session.timeInDate < currentWeekStart || session.timeInDate > currentWeekEnd) {
+        return false;
+      }
+      return isWeekday(session.timeInDate);
+    });
     const completedMinutes = completed.reduce(
       (sum, session) =>
         sum +
@@ -148,21 +140,25 @@ export default function Dashboard() {
       0
     );
 
-    const activeMinutes = activeSession
-      ? diffMinutes(
-          activeSession.timeInRoundedDate,
-          roundDownToHour(now)
-        )
-      : 0;
+    const activeMinutes =
+      activeSession &&
+      activeSession.timeInDate &&
+      activeSession.timeInDate >= currentWeekStart &&
+      activeSession.timeInDate <= currentWeekEnd &&
+      isWeekday(activeSession.timeInDate)
+        ? diffMinutes(
+            activeSession.timeInRoundedDate,
+            roundDownToHour(now)
+          )
+        : 0;
 
-    const totalMinutes =
-      completedMinutes + activeMinutes + BASELINE_COMPLETED_MINUTES;
+    const totalMinutes = completedMinutes + activeMinutes;
     const totalHours = minutesToHours(totalMinutes);
     const remainingHours = Math.max(TARGET_HOURS - totalHours, 0);
     const progressPercentage = Math.min((totalHours / TARGET_HOURS) * 100, 100);
     
     return { totalMinutes, totalHours, remainingHours, progressPercentage };
-  }, [activeSession, normalizedSessions, now]);
+  }, [activeSession, currentWeekEnd, currentWeekStart, normalizedSessions, now]);
 
   const dayTotals = useMemo(() => {
     const totalsByDay = Array.from({ length: 7 }, () => 0);
