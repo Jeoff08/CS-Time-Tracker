@@ -4,15 +4,17 @@ import { db } from "../firebase.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useSessions } from "../hooks/useSessions.js";
 import {
-  BASELINE_COMPLETED_MINUTES,
   TARGET_HOURS,
   diffMinutes,
+  endOfWeekFriday,
   formatDate,
   formatTime,
+  formatHours,
+  isWeekday,
   minutesToHours,
   roundDownToHour,
   roundUpToHour,
-  formatHours,
+  startOfWeekMonday,
 } from "../utils/time.js";
 
 const toDate = (ms) => (ms ? new Date(ms) : null);
@@ -48,23 +50,42 @@ export default function TimeControls() {
     [normalizedSessions]
   );
 
-  const activeMinutes = activeSession
-    ? diffMinutes(
-        activeSession.timeInRoundedDate,
-        roundDownToHour(now)
-      )
-    : 0;
+  const currentWeekStart = useMemo(() => startOfWeekMonday(now), [now]);
+  const currentWeekEnd = useMemo(
+    () => endOfWeekFriday(currentWeekStart),
+    [currentWeekStart]
+  );
+
+  const activeMinutes =
+    activeSession &&
+    activeSession.timeInDate &&
+    activeSession.timeInDate >= currentWeekStart &&
+    activeSession.timeInDate <= currentWeekEnd &&
+    isWeekday(activeSession.timeInDate)
+      ? diffMinutes(
+          activeSession.timeInRoundedDate,
+          roundDownToHour(now)
+        )
+      : 0;
 
   const completedMinutes = normalizedSessions.reduce((sum, session) => {
     if (!session.timeOutRoundedDate || !session.timeInRoundedDate) {
+      return sum;
+    }
+    if (!session.timeInDate) {
+      return sum;
+    }
+    if (session.timeInDate < currentWeekStart || session.timeInDate > currentWeekEnd) {
+      return sum;
+    }
+    if (!isWeekday(session.timeInDate)) {
       return sum;
     }
     return (
       sum + diffMinutes(session.timeInRoundedDate, session.timeOutRoundedDate)
     );
   }, 0);
-  const totalMinutes =
-    completedMinutes + activeMinutes + BASELINE_COMPLETED_MINUTES;
+  const totalMinutes = completedMinutes + activeMinutes;
   const totalHours = minutesToHours(totalMinutes);
   const goalCompleted = totalHours >= TARGET_HOURS;
   const progressPercentage = Math.min((totalHours / TARGET_HOURS) * 100, 100);
