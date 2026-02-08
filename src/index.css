@@ -1,0 +1,215 @@
+@import "tailwindcss";
+
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  background-color: #0b0b0f;
+  color: #ffffff;
+  --landing-bg: radial-gradient(circle at 20% 10%, rgba(244, 63, 94, 0.35), transparent 45%),
+    radial-gradient(circle at 75% 70%, rgba(245, 158, 11, 0.4), transparent 45%),
+    radial-gradient(circle at 50% 100%, rgba(234, 88, 12, 0.35), transparent 55%),
+    #0b0b0f;
+  --mobile-bg: #f8fafc;
+  --mobile-card: #ffffff;
+  --mobile-card-strong: #111827;
+  --mobile-text: #111827;
+  --mobile-muted: #6b7280;
+  --mobile-track: #eef2f7;
+  --mobile-fill: #f97316;
+  --mobile-accent: #fb923c;
+  --mobile-nav-bg: #ffffff;
+  --mobile-nav-border: #e5e7eb;
+  --mobile-nav-text: #334155;
+  --web-bg: #f5f6f8;
+  --web-panel: #ffffff;
+  --web-border: #e5e7eb;
+  --web-muted: #6b7280;
+  --web-text: #111827;
+  --web-accent: #f97316;
+  --web-accent-soft: #fff7ed;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.card-hover {
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.card-hover:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.18);
+}
+
+.auth-shell {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.auth-left {
+  background: radial-gradient(circle at 20% 10%, rgba(234, 88, 12, 0.55), transparent 45%),
+    radial-gradient(circle at 80% 90%, rgba(251, 191, 36, 0.4), transparent 45%),
+    #0b0b0f;
+}
+
+.auth-left::after {
+  content: "";
+  position: absolute;
+  right: -24px;
+  top: 0;
+  bottom: 0;
+  width: 48px;
+  background: radial-gradient(circle at left, #fff 30%, transparent 32%),
+    radial-gradient(circle at left, #fff 30%, transparent 32%),
+    radial-gradient(circle at left, #fff 30%, transparent 32%);
+  background-size: 48px 48px;
+  background-position: 0 20%, 0 50%, 0 80%;
+  opacity: 0.8;
+}
+
+.landing-shell {
+  background: var(--landing-bg);
+}
+
+@media (max-width: 639px) {
+  .landing-shell {
+    background: #0b0b0f;
+  }
+}
+
+.landing-cta {
+  background: linear-gradient(90deg, #f97316, #facc15);
+  color: #120a03;
+  box-shadow: 0 12px 40px rgba(249, 115, 22, 0.35);
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.landing-cta:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 50px rgba(249, 115, 22, 0.5);
+}
+
+.mobile-shell {
+  background: var(--mobile-bg);
+}
+
+.mobile-card {
+  background: var(--mobile-card);
+  color: var(--mobile-text);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
+}
+
+.mobile-card-strong {
+  background: var(--mobile-card-strong);
+  color: #ffffff;
+}
+
+.mobile-muted {
+  color: var(--mobile-muted);
+}
+
+.mobile-track {
+  background: var(--mobile-track);
+}
+
+.mobile-fill {
+  background: var(--mobile-fill);
+}
+
+.mobile-nav {
+  background: var(--mobile-nav-bg);
+  border-color: var(--mobile-nav-border);
+  color: var(--mobile-nav-text);
+}
+
+.web-shell {
+  background: var(--web-bg);
+  color: var(--web-text);
+}
+
+.web-card {
+  background: var(--web-panel);
+  border: 1px solid var(--web-border);
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.08);
+}
+
+.web-muted {
+  color: var(--web-muted);
+}
+
+.web-accent {
+  color: var(--web-accent);
+}
+
+.web-accent-bg {
+  background: var(--web-accent);
+  color: #fff;
+}
+
+.web-accent-soft {
+  background: var(--web-accent-soft);
+  color: var(--web-accent);
+}
+
+.web-sidebar {
+  background: #111827;
+  color: #fff;
+}
+
+.landing-card {
+  background: rgba(14, 14, 18, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 20px 50px rgba(3, 7, 18, 0.6);
+}
+
+.landing-soft {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.landing-active {
+  background: linear-gradient(90deg, #f97316, #facc15);
+  color: #120a03;
+}
+
+.landing-active:hover {
+  filter: brightness(1.05);
+}
+
+.dash-hero {
+  background: radial-gradient(circle at 20% 10%, rgba(234, 88, 12, 0.45), transparent 45%),
+    radial-gradient(circle at 80% 90%, rgba(251, 191, 36, 0.3), transparent 45%),
+    #0b0b0f;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 20px 50px rgba(3, 7, 18, 0.6);
+}
+
+.dash-card {
+  background: rgba(14, 14, 18, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 20px 50px rgba(3, 7, 18, 0.6);
+}
+
+.dash-soft {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.dash-chip {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+
+.dash-highlight {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
