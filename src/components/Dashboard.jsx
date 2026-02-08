@@ -50,6 +50,8 @@ export default function Dashboard() {
   const [pulseAnimation, setPulseAnimation] = useState(false);
   const [analyticsModalOpen, setAnalyticsModalOpen] = useState(false);
   const [selectedWeekStart, setSelectedWeekStart] = useState(null);
+  const [recentModalOpen, setRecentModalOpen] = useState(false);
+  const [detailSession, setDetailSession] = useState(null);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
@@ -126,6 +128,10 @@ export default function Dashboard() {
   const unarchivedSessions = useMemo(
     () => normalizedSessions.filter((session) => !session.archivedAt),
     [normalizedSessions]
+  );
+  const recentSessions = useMemo(
+    () => unarchivedSessions.slice(0, 6),
+    [unarchivedSessions]
   );
 
   const activeSession = useMemo(
@@ -276,6 +282,22 @@ export default function Dashboard() {
       return;
     }
     setSelectedSessionIds(unarchivedSessions.map((session) => session.id));
+  };
+
+  const toggleSelectRecentAll = () => {
+    if (recentSessions.length === 0) {
+      return;
+    }
+    const recentIds = recentSessions.map((session) => session.id);
+    const allSelected = recentIds.every((id) => selectedSessionIds.includes(id));
+    setSelectedSessionIds((prev) => {
+      if (allSelected) {
+        return prev.filter((id) => !recentIds.includes(id));
+      }
+      const merged = new Set(prev);
+      recentIds.forEach((id) => merged.add(id));
+      return Array.from(merged);
+    });
   };
 
   const handleRequestDelete = (session) => {
@@ -521,13 +543,52 @@ export default function Dashboard() {
               <p className="text-lg font-bold text-slate-900">Recent Sessions</p>
               <p className="text-sm text-slate-500">Track your time history</p>
             </div>
-            <span className="rounded-full bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-600">
-              {normalizedSessions.length} total
+            <div className="flex items-center gap-2">
+              <span className="rounded-full bg-slate-100 px-4 py-2 text-xs font-semibold text-slate-600">
+                {unarchivedSessions.length} active
+              </span>
+              <button
+                type="button"
+                onClick={() => setRecentModalOpen(true)}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"
+                aria-label="View recent sessions"
+              >
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="9" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+            <label className="inline-flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={
+                  recentSessions.length > 0 &&
+                  recentSessions.every((session) => selectedSessionIds.includes(session.id))
+                }
+                onChange={toggleSelectRecentAll}
+                className="h-4 w-4 rounded border-slate-300 text-orange-600 focus:ring-orange-400"
+              />
+              Select recent
+            </label>
+            <span className="text-xs text-slate-500">
+              {selectedSessionIds.length} selected
             </span>
+            <button
+              type="button"
+              onClick={handleRequestArchiveSelected}
+              disabled={selectedSessionIds.length === 0 || isBulkArchiving}
+              className="ml-auto inline-flex items-center gap-2 rounded-full bg-orange-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-orange-500 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isBulkArchiving ? "Archiving..." : "Archive selected"}
+            </button>
           </div>
           
           <div className="mt-6 space-y-3">
-            {!loading && normalizedSessions.length === 0 && (
+            {!loading && unarchivedSessions.length === 0 && (
               <div className="rounded-xl bg-slate-50 p-6 text-center">
                 <svg className="mx-auto h-12 w-12 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -537,60 +598,41 @@ export default function Dashboard() {
               </div>
             )}
             
-            {normalizedSessions.slice(0, 3).map((session, index) => {
-              const durationMinutes = session.timeOutRoundedDate && session.timeInRoundedDate
-                ? diffMinutes(session.timeInRoundedDate, session.timeOutRoundedDate)
-                : 0;
-              const durationLabel = session.timeOutRoundedDate && session.timeInRoundedDate
-                ? formatHours(minutesToHours(durationMinutes))
-                : "In progress";
-              
-              return (
-                <div 
-                  key={session.id}
-                  className="group relative overflow-hidden rounded-xl border border-slate-200 bg-white p-5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
-                  style={{ animationDelay: `${index * 100}ms` }}
-                >
-                  <div className="absolute left-0 top-0 h-full w-1 bg-gradient-to-b from-orange-500 to-green-400 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-                  <div className="relative pl-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-xs text-slate-500">{formatDate(session.timeInDate)}</p>
-                        <p className="text-lg font-bold text-slate-900">
-                          {formatTime(session.timeInRoundedDate)}
-                          {!session.timeOutDate && (
-                            <span className="ml-2 inline-flex h-2 w-2 animate-ping rounded-full bg-green-400"></span>
-                          )}
-                        </p>
+            <div className="grid grid-cols-3 gap-4 sm:grid-cols-4">
+              {recentSessions.map((session, index) => {
+                const dayNumber = session.timeInDate?.getDate();
+                const monthLabel = session.timeInDate?.toLocaleString("en-US", { month: "short" });
+
+                return (
+                  <div
+                    key={session.id}
+                    className="flex flex-col items-center gap-2"
+                    style={{ animationDelay: `${index * 80}ms` }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setDetailSession(session)}
+                      className="group inline-flex h-16 w-16 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md"
+                      aria-label={`View session on ${formatDate(session.timeInDate)}`}
+                    >
+                      <div className="text-center leading-tight">
+                        <div className="text-sm font-semibold">{dayNumber || "--"}</div>
+                        <div className="text-[10px] uppercase tracking-wide text-slate-400">{monthLabel || ""}</div>
                       </div>
-                      <div className="text-right">
-                        <div className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1">
-                          <span className="text-sm font-bold text-slate-700">{durationLabel}</span>
-                        </div>
-                        <p className="mt-1 text-xs text-slate-500">Duration</p>
-                      </div>
-                    </div>
-                    <div className="mt-4 flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleRequestArchive(session)}
-                        disabled={archivingSessionIds.includes(session.id)}
-                        className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-700 transition hover:border-orange-300 hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {archivingSessionIds.includes(session.id) ? "Archiving..." : "Archive"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleRequestDelete(session)}
-                        className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:border-red-300 hover:bg-red-100"
-                      >
-                        Delete
-                      </button>
-                    </div>
+                    </button>
+                    <label className="inline-flex items-center gap-2 text-xs text-slate-500">
+                      <input
+                        type="checkbox"
+                        checked={isSessionSelected(session.id)}
+                        onChange={() => toggleSelectSession(session.id)}
+                        className="h-4 w-4 rounded border-slate-300 text-orange-600 focus:ring-orange-400"
+                      />
+                      Select
+                    </label>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
@@ -797,108 +839,42 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                {unarchivedSessions.map((session, index) => {
-                  const durationMinutes = session.timeOutRoundedDate && session.timeInRoundedDate
-                    ? diffMinutes(session.timeInRoundedDate, session.timeOutRoundedDate)
-                    : 0;
-                  const durationLabel = session.timeOutRoundedDate && session.timeInRoundedDate
-                    ? formatHours(minutesToHours(durationMinutes))
-                    : "In progress";
-                  
-                  return (
-                    <div 
-                      key={session.id}
-                      className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-md"
-                      style={{ animationDelay: `${index * 50}ms` }}
-                    >
-                      <div className="absolute left-0 top-0 h-full w-1 bg-gradient-to-b from-orange-500 to-green-400 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-                      <div className="relative pl-4">
-                        <div className="mb-4 flex items-center gap-2 text-xs text-slate-400">
+                <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8">
+                  {unarchivedSessions.map((session, index) => {
+                    const dayNumber = session.timeInDate?.getDate();
+                    const monthLabel = session.timeInDate?.toLocaleString("en-US", { month: "short" });
+
+                    return (
+                      <div
+                        key={session.id}
+                        className="flex flex-col items-center gap-2"
+                        style={{ animationDelay: `${index * 30}ms` }}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setDetailSession(session)}
+                          className="group relative inline-flex h-16 w-16 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md"
+                          aria-label={`View session on ${formatDate(session.timeInDate)}`}
+                        >
+                          <span className="absolute inset-0 rounded-full bg-gradient-to-br from-indigo-50 via-transparent to-transparent opacity-0 transition group-hover:opacity-100" />
+                          <div className="text-center leading-tight">
+                            <div className="text-sm font-semibold">{dayNumber || "--"}</div>
+                            <div className="text-[10px] uppercase tracking-wide text-slate-400">{monthLabel || ""}</div>
+                          </div>
+                        </button>
+                        <label className="inline-flex items-center gap-2 text-xs text-slate-500">
                           <input
                             type="checkbox"
                             checked={isSessionSelected(session.id)}
                             onChange={() => toggleSelectSession(session.id)}
                             className="h-4 w-4 rounded border-slate-300 text-orange-600 focus:ring-orange-400"
                           />
-                          Select for archive
-                        </div>
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                          <div>
-                            <p className="text-sm text-slate-500">Date</p>
-                            <p className="text-lg font-bold text-slate-900">{formatDate(session.timeInDate)}</p>
-                            <p className="mt-1 text-sm text-slate-500">
-                              Actual: {formatTime(session.timeInDate)}
-                              {session.timeOutDate && ` - ${formatTime(session.timeOutDate)}`}
-                            </p>
-                            <div className="mt-3 flex flex-wrap items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => handleRequestArchive(session)}
-                                disabled={archivingSessionIds.includes(session.id)}
-                                className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-700 transition hover:border-orange-300 hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-60"
-                              >
-                                <svg
-                                  aria-hidden="true"
-                                  viewBox="0 0 24 24"
-                                  className="h-4 w-4"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2"
-                                >
-                                  <path d="M4 4h16v4H4z" />
-                                  <path d="M6 8v12h12V8" />
-                                  <path d="M9 12h6" />
-                                </svg>
-                                {archivingSessionIds.includes(session.id) ? "Archiving..." : "Archive"}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleRequestDelete(session)}
-                                className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:border-red-300 hover:bg-red-100"
-                              >
-                                <svg
-                                  aria-hidden="true"
-                                  viewBox="0 0 24 24"
-                                  className="h-4 w-4"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="2"
-                                >
-                                  <path d="M3 6h18" />
-                                  <path d="M8 6V4h8v2" />
-                                  <path d="M6 6l1 14h10l1-14" />
-                                </svg>
-                                Delete
-                              </button>
-                            </div>
-                          </div>
-                          
-                          <div>
-                            <p className="text-sm text-slate-500">Rounded Time</p>
-                            <p className="text-lg font-bold text-slate-900">
-                              {formatTime(session.timeInRoundedDate)}
-                              {session.timeOutRoundedDate && (
-                                <span className="ml-2 text-slate-500">→ {formatTime(session.timeOutRoundedDate)}</span>
-                              )}
-                            </p>
-                          </div>
-                          
-                          <div>
-                            <p className="text-sm text-slate-500">Duration</p>
-                            <div className="flex items-center justify-between">
-                              <span className={`text-2xl font-bold ${session.timeOutDate ? 'text-slate-900' : 'text-emerald-500'}`}>
-                                {durationLabel}
-                              </span>
-                              {!session.timeOutDate && (
-                                <span className="inline-flex h-3 w-3 animate-ping rounded-full bg-green-400"></span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
+                          Select
+                        </label>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             </div>
           </div>
@@ -1188,6 +1164,179 @@ export default function Dashboard() {
                     );
                   })}
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {recentModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+          onClick={() => setRecentModalOpen(false)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Active Sessions</h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Showing {recentSessions.length} of {unarchivedSessions.length}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRecentModalOpen(false)}
+                className="rounded-full p-1 text-slate-400 transition hover:text-slate-900"
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="mt-4 max-h-[50vh] space-y-3 overflow-y-auto">
+              {recentSessions.length === 0 ? (
+                <div className="rounded-xl bg-slate-50 p-6 text-center text-sm text-slate-500">
+                  No active sessions.
+                </div>
+              ) : (
+                recentSessions.map((session) => {
+                  const durationMinutes = session.timeOutRoundedDate && session.timeInRoundedDate
+                    ? diffMinutes(session.timeInRoundedDate, session.timeOutRoundedDate)
+                    : 0;
+                  const durationLabel = session.timeOutRoundedDate && session.timeInRoundedDate
+                    ? formatHours(minutesToHours(durationMinutes))
+                    : "In progress";
+
+                  return (
+                    <div key={session.id} className="rounded-xl border border-slate-200 p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-sm font-semibold text-slate-900">
+                            {formatDate(session.timeInDate)}
+                          </div>
+                          <div className="text-xs text-slate-500">
+                            {formatTime(session.timeInRoundedDate)}
+                            {session.timeOutRoundedDate && ` - ${formatTime(session.timeOutRoundedDate)}`}
+                          </div>
+                        </div>
+                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                          {durationLabel}
+                        </span>
+                      </div>
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleRequestArchive(session)}
+                          disabled={archivingSessionIds.includes(session.id)}
+                          className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-semibold text-orange-700 transition hover:border-orange-300 hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {archivingSessionIds.includes(session.id) ? "Archiving..." : "Archive"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRequestDelete(session)}
+                          className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:border-red-300 hover:bg-red-100"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {detailSession && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4"
+          onClick={() => setDetailSession(null)}
+          role="dialog"
+          aria-modal="true"
+        >
+          <div
+            className="w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="relative border-b border-slate-200 bg-gradient-to-r from-indigo-50 via-white to-sky-50 p-6">
+              <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-indigo-100/60 blur-2xl" />
+              <div className="relative flex items-start justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">Session Details</h3>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {formatDate(detailSession.timeInDate)}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setDetailSession(null)}
+                  className="rounded-full p-1 text-slate-400 transition hover:text-slate-900"
+                  aria-label="Close"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6">
+              <div className="grid gap-4 text-sm text-slate-600">
+                <div className="rounded-xl border border-slate-200 p-4">
+                  <div className="text-xs uppercase tracking-[0.2em] text-slate-400">Actual Time</div>
+                  <div className="mt-2 text-base font-semibold text-slate-900">
+                    {formatTime(detailSession.timeInDate)}
+                    {detailSession.timeOutDate && ` - ${formatTime(detailSession.timeOutDate)}`}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-slate-200 p-4">
+                  <div className="text-xs uppercase tracking-[0.2em] text-slate-400">Rounded Time</div>
+                  <div className="mt-2 text-base font-semibold text-slate-900">
+                    {formatTime(detailSession.timeInRoundedDate)}
+                    {detailSession.timeOutRoundedDate && ` - ${formatTime(detailSession.timeOutRoundedDate)}`}
+                  </div>
+                </div>
+                <div className="rounded-xl border border-slate-200 p-4">
+                  <div className="text-xs uppercase tracking-[0.2em] text-slate-400">Duration</div>
+                  <div className="mt-2 text-base font-semibold text-slate-900">
+                    {detailSession.timeOutRoundedDate && detailSession.timeInRoundedDate
+                      ? formatHours(
+                          minutesToHours(
+                            diffMinutes(detailSession.timeInRoundedDate, detailSession.timeOutRoundedDate)
+                          )
+                        )
+                      : "In progress"}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-5 flex flex-wrap items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDetailSession(null);
+                    handleRequestDelete(detailSession);
+                  }}
+                  className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-100"
+                >
+                  Delete
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleArchiveSession(detailSession.id);
+                    setDetailSession(null);
+                  }}
+                  disabled={archivingSessionIds.includes(detailSession.id)}
+                  className="rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-500 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {archivingSessionIds.includes(detailSession.id) ? "Archiving..." : "Archive"}
+                </button>
               </div>
             </div>
           </div>
