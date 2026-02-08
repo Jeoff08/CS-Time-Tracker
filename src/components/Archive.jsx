@@ -54,6 +54,7 @@ export default function Archive() {
         timeOutDate: toDate(session.timeOut),
         timeInRoundedDate: toDate(session.timeInRounded),
         timeOutRoundedDate: toDate(session.timeOutRounded),
+        archivedAtDate: toDate(session.archivedAt),
       })),
     [sessions]
   );
@@ -63,7 +64,8 @@ export default function Archive() {
 
     normalizedSessions.forEach((session) => {
       if (!session.timeInDate || !session.archivedAt) return;
-      const weekStart = startOfWeekMonday(session.timeInDate);
+      const referenceDate = session.archivedAtDate || session.timeInDate;
+      const weekStart = startOfWeekMonday(referenceDate);
       const weekEnd = endOfWeekFriday(weekStart);
       const key = weekStart.toISOString().slice(0, 10);
 
