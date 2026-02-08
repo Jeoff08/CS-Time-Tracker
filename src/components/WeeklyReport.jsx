@@ -1,22 +1,26 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { jsPDF } from "jspdf";
-import { doc, updateDoc } from "firebase/firestore";
+import { collection, doc, onSnapshot, orderBy, query, updateDoc } from "firebase/firestore";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useSessions } from "../hooks/useSessions.js";
-import { db } from "../firebase.js";
+import { db, firebaseConfigured } from "../firebase.js";
 import {
   TARGET_HOURS,
-  BASELINE_COMPLETED_MINUTES,
   diffMinutes,
   formatDate,
   formatDateTime,
   formatHours,
   formatTime,
+  isWeekday,
   minutesToHours,
 } from "../utils/time.js";
 
 const toDate = (ms) => (ms ? new Date(ms) : null);
+const mapTodo = (docSnap) => {
+  const data = docSnap.data();
+  return { id: docSnap.id, ...data };
+};
 const formatDuration = (minutes) => {
   const total = Math.round(minutes);
   const hours = Math.floor(total / 60);
@@ -39,12 +43,34 @@ export default function WeeklyReport() {
   const [restoringSessionId, setRestoringSessionId] = useState(null);
   const [selectedReportIds, setSelectedReportIds] = useState([]);
   const [bulkRestoreModalOpen, setBulkRestoreModalOpen] = useState(false);
+  const [todos, setTodos] = useState([]);
   const textareaRef = useRef(null);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (!user?.uid) {
+      setTodos([]);
+      return undefined;
+    }
+    if (!firebaseConfigured || !db) {
+      setTodos([]);
+      return undefined;
+    }
+    const todosRef = collection(db, "users", user.uid, "todos");
+    const todosQuery = query(todosRef, orderBy("createdAt", "desc"));
+    const unsubscribe = onSnapshot(
+      todosQuery,
+      (snapshot) => {
+        setTodos(snapshot.docs.map(mapTodo));
+      },
+      () => setTodos([])
+    );
+    return () => unsubscribe();
+  }, [user?.uid]);
 
   useEffect(() => {
     setCharCount(weeklyReport.length);
@@ -98,20 +124,28 @@ export default function WeeklyReport() {
   }, [visibleReportSessions]);
 
   const totals = useMemo(() => {
-    const completed = reportSessions.filter((session) => session.timeOut);
+    const completed = reportSessions.filter((session) => {
+      if (!session.timeOut || !session.timeInDate) return false;
+      return isWeekday(session.timeInDate);
+    });
     const completedMinutes = completed.reduce(
       (sum, session) =>
         sum + diffMinutes(session.timeInRoundedDate, session.timeOutRoundedDate),
       0
     );
 
-    const totalMinutes = completedMinutes + BASELINE_COMPLETED_MINUTES;
+    const totalMinutes = completedMinutes;
     const totalHours = minutesToHours(totalMinutes);
     const remainingHours = Math.max(TARGET_HOURS - totalHours, 0);
     const progressPercentage = Math.min((totalHours / TARGET_HOURS) * 100, 100);
     
     return { totalMinutes, totalHours, remainingHours, progressPercentage };
   }, [reportSessions]);
+
+  const todoSummary = useMemo(() => {
+    const completed = todos.filter((todo) => todo.completed).length;
+    return { total: todos.length, completed };
+  }, [todos]);
 
   const handleExportPdf = async () => {
     setIsGenerating(true);
@@ -225,6 +259,34 @@ export default function WeeklyReport() {
       docPdf.text(reportLines, 18, y + 2);
 
       y += reportLines.length * 6 + 16;
+
+      // Todo List Section
+      docPdf.setFontSize(12);
+      docPdf.setTextColor(0, 0, 0);
+      docPdf.text("Todo List", 14, y);
+      y += 8;
+
+      const todoLines = todos.length > 0
+        ? todos.map((todo) => {
+            const suffix = todo.completedAt
+              ? ` (done ${formatDateTime(new Date(todo.completedAt))})`
+              : "";
+            return `${todo.completed ? "[x]" : "[ ]"} ${todo.text}${suffix}`;
+          })
+        : ["No todos provided."];
+      const todoTextLines = docPdf.splitTextToSize(todoLines.join("\n"), 180);
+      const todoBoxHeight = todoTextLines.length * 5 + 10;
+      if (y + todoBoxHeight > 270) {
+        docPdf.addPage();
+        y = 20;
+      }
+      docPdf.setDrawColor(200, 200, 200);
+      docPdf.setFillColor(255, 255, 255);
+      docPdf.roundedRect(14, y - 4, 182, todoBoxHeight, 2, 2, "FD");
+      docPdf.setFontSize(9.5);
+      docPdf.setTextColor(50, 50, 50);
+      docPdf.text(todoTextLines, 18, y + 2);
+      y += todoBoxHeight + 10;
 
       // Days Table (with reflection)
       docPdf.setFontSize(12);
@@ -673,6 +735,37 @@ Next week priorities:
                   <p className="text-lg font-bold text-slate-900">{totals.progressPercentage.toFixed(1)}%</p>
                 </div>
               </div>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <h4 className="font-semibold text-slate-900">Todo List</h4>
+                <span className="text-xs text-slate-500">
+                  {todoSummary.completed}/{todoSummary.total} completed
+                </span>
+              </div>
+              {todos.length === 0 ? (
+                <p className="text-sm text-slate-500">No todos available.</p>
+              ) : (
+                <div className="space-y-2 text-sm text-slate-600">
+                  {todos.slice(0, 6).map((todo) => (
+                    <div key={todo.id} className="flex items-center gap-2">
+                      <span
+                        className={`h-2.5 w-2.5 rounded-full ${
+                          todo.completed ? "bg-emerald-500" : "bg-slate-300"
+                        }`}
+                      />
+                      <span className={todo.completed ? "line-through text-slate-400" : ""}>
+                        {todo.text}
+                      </span>
+                    </div>
+                  ))}
+                  {todos.length > 6 && (
+                    <div className="text-xs text-slate-400">
+                      +{todos.length - 6} more todos
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div className="rounded-xl border border-slate-200 bg-white p-4">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
