@@ -3,11 +3,13 @@ import { useAuth } from "../context/AuthContext.jsx";
 import { useSessions } from "../hooks/useSessions.js";
 import {
   TARGET_HOURS,
-  BASELINE_COMPLETED_MINUTES,
   diffMinutes,
+  endOfWeekFriday,
   formatDate,
   formatHours,
+  isWeekday,
   minutesToHours,
+  startOfWeekMonday,
 } from "../utils/time.js";
 
 export default function Profile() {
@@ -16,15 +18,23 @@ export default function Profile() {
   const [hoveredCard, setHoveredCard] = useState(null);
 
   const summary = useMemo(() => {
-    const completed = sessions.filter((session) => session.timeOut);
+    const now = new Date();
+    const currentWeekStart = startOfWeekMonday(now);
+    const currentWeekEnd = endOfWeekFriday(currentWeekStart);
+    const completed = sessions.filter((session) => {
+      if (!session.timeOut || !session.timeIn) return false;
+      const timeInDate = new Date(session.timeIn);
+      if (timeInDate < currentWeekStart || timeInDate > currentWeekEnd) {
+        return false;
+      }
+      return isWeekday(timeInDate);
+    });
     const totalMinutes = completed.reduce(
       (sum, session) =>
         sum + diffMinutes(new Date(session.timeInRounded), new Date(session.timeOutRounded)),
       0
     );
-    const totalHours = minutesToHours(
-      totalMinutes + BASELINE_COMPLETED_MINUTES
-    );
+    const totalHours = minutesToHours(totalMinutes);
     const remainingHours = Math.max(TARGET_HOURS - totalHours, 0);
     const progressPercentage = Math.min((totalHours / TARGET_HOURS) * 100, 100);
 
@@ -256,15 +266,15 @@ export default function Profile() {
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                   <div className="text-2xl font-bold text-indigo-600">
-                    {formatHours(minutesToHours(BASELINE_COMPLETED_MINUTES))}
+                    {formatHours(summary.totalHours)}
                   </div>
-                  <div className="mt-1 text-sm text-slate-500">Baseline Hours</div>
+                  <div className="mt-1 text-sm text-slate-500">Week Total</div>
                 </div>
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                   <div className="text-2xl font-bold text-slate-900">
-                    {formatHours(summary.totalHours)}
+                    {formatHours(summary.remainingHours)}
                   </div>
-                  <div className="mt-1 text-sm text-slate-500">Current Total</div>
+                  <div className="mt-1 text-sm text-slate-500">Remaining</div>
                 </div>
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                   <div className="text-2xl font-bold text-sky-600">
